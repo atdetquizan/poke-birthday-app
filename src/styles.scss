@@ -2617,8 +2617,8 @@ body.gsap-missing {
 .trailer-hud {
   position       : absolute;
   left           : clamp(18px, 6vw, 72px);
-  bottom         : clamp(28px, 9vh, 90px);
-  z-index        : 3;
+  bottom         : calc(16svh + clamp(34px, 6vh, 78px));
+  z-index        : 4;
   display        : grid;
   gap            : 4px;
   padding        : 16px 18px;
@@ -2839,7 +2839,7 @@ body.gsap-missing {
   .trailer-hud {
     left  : 14px;
     right : 14px;
-    bottom: 88px;
+    bottom: calc(16svh + 18px);
   }
 
   .trailer-character {
