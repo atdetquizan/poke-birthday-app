@@ -3359,3 +3359,177 @@ body {
     font-size: .8rem;
   }
 }
+
+/* V14: modal de nombre con confirmacion inmediata y opcion de solo ver. */
+.guest-name-panel.is-decline .guest-name-kicker {
+  color       : #ffd5d5;
+  border-color: rgba(255, 92, 92, .42);
+  background  : rgba(255, 92, 92, .1);
+}
+
+.guest-name-panel.is-decline .guest-name-submit {
+  color     : #fff;
+  background: linear-gradient(180deg, #ff6b6b, #df3546 52%, #a71927);
+  box-shadow: 0 18px 34px rgba(247, 47, 47, .24), inset 0 2px 0 rgba(255, 255, 255, .32);
+}
+
+.guest-name-submit.is-loading {
+  cursor        : wait;
+  filter        : saturate(.9) brightness(.96);
+  pointer-events: none;
+}
+
+.guest-name-submit.is-loading::after {
+  content: "...";
+}
+
+.guest-name-secondary {
+  width         : 100%;
+  min-height    : 48px;
+  margin-top     : 10px;
+  border        : 1px solid rgba(255, 255, 255, .18);
+  border-radius : 18px;
+  color         : rgba(255, 255, 255, .86);
+  background    : rgba(255, 255, 255, .08);
+  box-shadow    : inset 0 1px 0 rgba(255, 255, 255, .12);
+  font-weight   : 950;
+  text-transform: uppercase;
+  letter-spacing: .035em;
+  cursor        : pointer;
+}
+
+.guest-name-secondary:hover,
+.guest-name-secondary:focus-visible {
+  background  : rgba(255, 255, 255, .13);
+  border-color: rgba(127, 230, 255, .34);
+}
+
+.guest-name-secondary:disabled {
+  cursor : not-allowed;
+  opacity: .48;
+}
+
+@media (max-width: 430px) {
+  .guest-name-submit {
+    min-height: 54px;
+  }
+
+  .guest-name-secondary {
+    min-height: 44px;
+    font-size : .84rem;
+  }
+}
+
+/* V12: after the RSVP is saved, hide action buttons and keep a clear confirmation message.
+   This prevents users from tapping twice or thinking they must confirm again. */
+.mobile-dock.floating-rsvp.has-response {
+  grid-template-columns: 1fr !important;
+  padding: 12px 12px calc(12px + env(safe-area-inset-bottom)) !important;
+  gap: 0 !important;
+}
+
+.mobile-dock.floating-rsvp.has-response .dock-status,
+.mobile-dock.floating-rsvp.has-response .dock-actions {
+  display: none !important;
+}
+
+.mobile-dock.floating-rsvp .dock-confirmed {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  width: 100%;
+  min-height: 72px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, .28);
+  border-radius: 24px;
+  color: #fff;
+  background:
+    radial-gradient(circle at 10% 0%, rgba(255, 255, 255, .34), transparent 38%),
+    linear-gradient(135deg, rgba(37, 166, 83, .98), rgba(29, 120, 61, .98));
+  box-shadow:
+    0 20px 46px rgba(0, 0, 0, .42),
+    0 0 0 1px rgba(88, 255, 154, .2),
+    inset 0 1px 0 rgba(255, 255, 255, .34);
+  overflow: hidden;
+}
+
+.mobile-dock.floating-rsvp.is-decline-response .dock-confirmed {
+  background:
+    radial-gradient(circle at 10% 0%, rgba(255, 255, 255, .28), transparent 38%),
+    linear-gradient(135deg, rgba(217, 73, 73, .98), rgba(147, 37, 45, .98));
+  box-shadow:
+    0 20px 46px rgba(0, 0, 0, .42),
+    0 0 0 1px rgba(255, 130, 130, .18),
+    inset 0 1px 0 rgba(255, 255, 255, .28);
+}
+
+.mobile-dock.floating-rsvp .dock-confirmed-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .18);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .24);
+}
+
+.mobile-dock.floating-rsvp .dock-confirmed-icon svg {
+  width: 26px;
+  height: 26px;
+  stroke-width: 3;
+}
+
+.mobile-dock.floating-rsvp .dock-confirmed-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mobile-dock.floating-rsvp .dock-confirmed-copy strong,
+.mobile-dock.floating-rsvp .dock-confirmed-copy small {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.mobile-dock.floating-rsvp .dock-confirmed-copy strong {
+  font-family: Luckiest Guy, Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(1rem, 4.3vw, 1.42rem);
+  line-height: .95;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  text-shadow: 0 3px 0 rgba(0, 0, 0, .24);
+}
+
+.mobile-dock.floating-rsvp .dock-confirmed-copy small {
+  color: rgba(255, 255, 255, .86);
+  font-size: clamp(.76rem, 3.2vw, .92rem);
+  font-weight: 800;
+  line-height: 1.16;
+}
+
+@media (max-width: 640px) {
+  .mobile-dock.floating-rsvp.has-response {
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .mobile-dock.floating-rsvp .dock-confirmed {
+    min-height: 62px;
+    padding: 10px 11px;
+    border-radius: 18px;
+    gap: 9px;
+  }
+
+  .mobile-dock.floating-rsvp .dock-confirmed-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 13px;
+  }
+
+  .mobile-dock.floating-rsvp .dock-confirmed-icon svg {
+    width: 21px;
+    height: 21px;
+  }
+}

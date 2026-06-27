@@ -58,11 +58,35 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   readonly lastSaved = signal(false);
   readonly savedStatus = signal<AttendanceStatus | undefined>(undefined);
   readonly guestNamePromptShake = signal(false);
+  readonly pendingGuestNameAction = signal<AttendanceStatus | undefined>(undefined);
+  readonly guestNamePromptStatus = computed<AttendanceStatus>(() => this.pendingGuestNameAction() || 'SI_ASISTIRE');
+  readonly guestNamePromptIsDecline = computed(() => this.guestNamePromptStatus() === 'NO_PODRE');
+  readonly guestNamePromptKicker = computed(() => this.guestNamePromptIsDecline() ? 'Avisar que no asistirás' : 'Confirmar asistencia');
+  readonly guestNamePromptTitle = computed(() => this.guestNamePromptIsDecline() ? '¿A nombre de quién avisamos?' : '¿A nombre de quién confirmamos?');
+  readonly guestNamePromptDescription = computed(() => this.guestNamePromptIsDecline()
+    ? 'Escribe tu nombre y al continuar registraremos que no podrás asistir.'
+    : 'Escribe tu nombre y al continuar confirmaremos tu asistencia automáticamente.');
+  readonly guestNamePromptSubmitLabel = computed(() => {
+    if (this.isSubmitting()) return 'Registrando...';
+    return this.guestNamePromptIsDecline() ? 'Continuar y avisar' : 'Continuar y confirmar';
+  });
   readonly responseSaved = computed(() => !!this.savedStatus());
   readonly responseStatusLabel = computed(() => {
     const status = this.savedStatus();
     if (status === 'SI_ASISTIRE') return `Confirmado: ${this.guestDisplayName()}`;
     if (status === 'NO_PODRE') return `Respuesta guardada: ${this.guestDisplayName()} no podrá asistir`;
+    return '';
+  });
+  readonly responseSavedTitle = computed(() => {
+    const status = this.savedStatus();
+    if (status === 'SI_ASISTIRE') return 'Asistencia confirmada';
+    if (status === 'NO_PODRE') return 'Respuesta guardada';
+    return '';
+  });
+  readonly responseSavedMessage = computed(() => {
+    const status = this.savedStatus();
+    if (status === 'SI_ASISTIRE') return `${this.guestDisplayName()}, tu asistencia quedó registrada correctamente.`;
+    if (status === 'NO_PODRE') return `${this.guestDisplayName()}, registramos que no podrás asistir.`;
     return '';
   });
 
@@ -84,6 +108,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
 
+    this.pendingGuestNameAction.set('SI_ASISTIRE');
     this.needsGuestName.set(true);
     this.updateDocumentMeta('Invitado');
   }
@@ -106,7 +131,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.revealInvitationInstantly();
   }
 
-  openGuestNamePrompt(): void {
+  openGuestNamePrompt(status: AttendanceStatus = 'SI_ASISTIRE'): void {
+    this.pendingGuestNameAction.set(status);
     this.needsGuestName.set(true);
     this.focusGuestNameInput();
   }
@@ -124,32 +150,67 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
     this.guestNameDraft.set(this.sanitizeDraft(input?.value || ''));
   }
 
-  saveGuestNameFromPrompt(): void {
+  async saveGuestNameFromPrompt(): Promise<void> {
     const name = this.clean(this.guestNameDraft());
 
     if (!name) {
-      this.showToast('Agrega tu nombre', 'Escribe un nombre para personalizar la invitación y registrar la asistencia.');
+      this.showToast('Agrega tu nombre', 'Escribe un nombre para registrar la asistencia.');
+      this.shakeGuestNamePanel();
+      return;
+    }
+
+    const statusToSubmit = this.pendingGuestNameAction() || 'SI_ASISTIRE';
+    this.applyGuestName(name, true);
+    this.needsGuestName.set(false);
+    this.pendingGuestNameAction.set(undefined);
+
+    this.animateGuestNameApplied();
+    await this.submitAttendance(statusToSubmit, { skipNamePrompt: true });
+  }
+
+  saveGuestNameOnlyFromPrompt(): void {
+    const name = this.clean(this.guestNameDraft());
+
+    if (!name) {
+      this.showToast('Agrega tu nombre', 'Escribe tu nombre para personalizar la invitación.');
       this.shakeGuestNamePanel();
       return;
     }
 
     this.applyGuestName(name, true);
     this.needsGuestName.set(false);
+    this.pendingGuestNameAction.set(undefined);
+    this.animateGuestNameApplied();
+    this.showToast('Invitación personalizada', `${name}, ya puedes revisar los detalles y confirmar cuando estés listo.`);
+  }
 
+
+  private animateGuestNameApplied(): void {
     window.setTimeout(() => {
-      gsap.fromTo('.guest-card, .welcome-card', { scale: 0.96, y: 12 }, { scale: 1, y: 0, duration: 0.35, ease: 'back.out(1.7)' });
+      gsap.fromTo(
+        '.guest-card, .welcome-card',
+        { scale: 0.96, y: 12 },
+        { scale: 1, y: 0, duration: 0.35, ease: 'back.out(1.7)' }
+      );
     }, 0);
   }
 
-  private async submitAttendance(status: AttendanceStatus): Promise<void> {
+  private async submitAttendance(status: AttendanceStatus, options: { skipNamePrompt?: boolean } = {}): Promise<void> {
     if (this.isSubmitting()) return;
 
     const guestName = this.clean(this.guestName());
 
     if (!guestName) {
-      this.openGuestNamePrompt();
-      this.showToast('Falta el nombre', 'Escribe tu nombre para personalizar y registrar la invitación.');
-      this.shakeGuestNamePanel();
+      if (!options.skipNamePrompt) {
+        this.openGuestNamePrompt(status);
+        this.showToast(
+          status === 'SI_ASISTIRE' ? 'Completa tu nombre' : 'Completa tu nombre',
+          status === 'SI_ASISTIRE'
+            ? 'Escribe tu nombre y al continuar confirmaremos tu asistencia.'
+            : 'Escribe tu nombre y al continuar registraremos que no podrás asistir.'
+        );
+        this.shakeGuestNamePanel();
+      }
       return;
     }
 
@@ -220,9 +281,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
 
     window.setTimeout(() => {
       gsap.fromTo(
-        '.dock-status',
+        '.dock-confirmed',
         { y: 10, opacity: 0, scale: 0.96 },
-        { y: 0, opacity: 1, scale: 1, duration: 0.35, ease: 'back.out(1.7)' }
+        { y: 0, opacity: 1, scale: 1, duration: 0.38, ease: 'back.out(1.7)' }
       );
     }, 0);
   }

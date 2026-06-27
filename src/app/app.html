@@ -359,54 +359,68 @@
   </section>
 </main>
 
-<aside class="mobile-dock floating-rsvp" aria-label="Confirmar asistencia">
+<aside
+  class="mobile-dock floating-rsvp"
+  [class.has-response]="responseSaved()"
+  [class.is-decline-response]="savedStatus() === 'NO_PODRE'"
+  aria-label="Confirmar asistencia"
+>
   @if (responseSaved()) {
-  <div class="dock-status" role="status" aria-live="polite">
-    <span class="dock-status-dot" aria-hidden="true"></span>
-    <span>{{ responseStatusLabel() }}</span>
+  <div class="dock-confirmed" role="status" aria-live="polite">
+    <span class="dock-confirmed-icon" aria-hidden="true">
+      @if (savedStatus() === 'NO_PODRE') {
+      <svg lucideCircleX aria-hidden="true"></svg>
+      } @else {
+      <svg lucideCircleCheck aria-hidden="true"></svg>
+      }
+    </span>
+    <span class="dock-confirmed-copy">
+      <strong>{{ responseSavedTitle() }}</strong>
+      <small>{{ responseSavedMessage() }}</small>
+    </span>
   </div>
   } @else {
   <div class="dock-status dock-status-prompt" role="status" aria-live="polite">
     <span class="dock-status-dot" aria-hidden="true"></span>
     <span>Confirma tu asistencia aquí</span>
   </div>
-  }
   <div class="dock-actions">
-  <button
-    class="dock-btn yes"
-    id="dockConfirm"
-    type="button"
-    aria-label="Sí, asistiré. Registrar asistencia en Google Sheets"
-    [disabled]="isSubmitting() || needsGuestName()"
-    [class.is-loading]="selectedStatus() === 'SI_ASISTIRE' && isSubmitting()"
-    [class.is-saved]="selectedStatus() === 'SI_ASISTIRE' && lastSaved()"
-    (click)="confirmAttendance()"
-  >
-    <span class="btn-icon" aria-hidden="true"
-      ><svg lucideCircleCheck aria-hidden="true"></svg
-    ></span>
-    <span class="btn-text"
-      ><strong>Confirmar</strong><small>Sí, asistiré</small></span
+    <button
+      class="dock-btn yes"
+      id="dockConfirm"
+      type="button"
+      aria-label="Sí, asistiré. Registrar asistencia en Google Sheets"
+      [disabled]="isSubmitting()"
+      [class.is-loading]="selectedStatus() === 'SI_ASISTIRE' && isSubmitting()"
+      [class.is-saved]="selectedStatus() === 'SI_ASISTIRE' && lastSaved()"
+      (click)="confirmAttendance()"
     >
-  </button>
-  <button
-    class="dock-btn no"
-    id="dockDecline"
-    type="button"
-    aria-label="No podré asistir. Registrar respuesta en Google Sheets"
-    [disabled]="isSubmitting() || needsGuestName()"
-    [class.is-loading]="selectedStatus() === 'NO_PODRE' && isSubmitting()"
-    [class.is-saved]="selectedStatus() === 'NO_PODRE' && lastSaved()"
-    (click)="declineAttendance()"
-  >
-    <span class="btn-icon" aria-hidden="true"
-      ><svg lucideCircleX aria-hidden="true"></svg
-    ></span>
-    <span class="btn-text"
-      ><strong>No podré</strong><small>No asistiré</small></span
+      <span class="btn-icon" aria-hidden="true"
+        ><svg lucideCircleCheck aria-hidden="true"></svg
+      ></span>
+      <span class="btn-text"
+        ><strong>Confirmar</strong><small>Sí, asistiré</small></span
+      >
+    </button>
+    <button
+      class="dock-btn no"
+      id="dockDecline"
+      type="button"
+      aria-label="No podré asistir. Registrar respuesta en Google Sheets"
+      [disabled]="isSubmitting()"
+      [class.is-loading]="selectedStatus() === 'NO_PODRE' && isSubmitting()"
+      [class.is-saved]="selectedStatus() === 'NO_PODRE' && lastSaved()"
+      (click)="declineAttendance()"
     >
-  </button>
+      <span class="btn-icon" aria-hidden="true"
+        ><svg lucideCircleX aria-hidden="true"></svg
+      ></span>
+      <span class="btn-text"
+        ><strong>No podré</strong><small>No asistiré</small></span
+      >
+    </button>
   </div>
+  }
 </aside>
 
 @if (guestNamePromptVisible()) {
@@ -416,13 +430,14 @@
   aria-modal="true"
   aria-labelledby="guestNameTitle"
 >
-  <div class="guest-name-panel cinema-card" [class.is-shaking]="guestNamePromptShake()">
-    <span class="guest-name-kicker">Personaliza tu invitación</span>
-    <h2 id="guestNameTitle">¿A nombre de quién registramos la invitación?</h2>
-    <p>
-      Escribe el nombre tal como quieres que aparezca. Puede ser una persona o
-      una familia.
-    </p>
+  <div
+    class="guest-name-panel cinema-card"
+    [class.is-shaking]="guestNamePromptShake()"
+    [class.is-decline]="guestNamePromptIsDecline()"
+  >
+    <span class="guest-name-kicker">{{ guestNamePromptKicker() }}</span>
+    <h2 id="guestNameTitle">{{ guestNamePromptTitle() }}</h2>
+    <p>{{ guestNamePromptDescription() }}</p>
 
     <label class="guest-name-field">
       <span>Nombre del invitado</span>
@@ -445,10 +460,20 @@
     <button
       class="guest-name-submit"
       type="button"
-      [disabled]="!guestNameDraft().trim()"
+      [disabled]="!guestNameDraft().trim() || isSubmitting()"
+      [class.is-loading]="isSubmitting()"
       (click)="saveGuestNameFromPrompt()"
     >
-      Continuar
+      {{ guestNamePromptSubmitLabel() }}
+    </button>
+
+    <button
+      class="guest-name-secondary"
+      type="button"
+      [disabled]="!guestNameDraft().trim() || isSubmitting()"
+      (click)="saveGuestNameOnlyFromPrompt()"
+    >
+      Solo ver invitación
     </button>
   </div>
 </section>
