@@ -1,0 +1,37 @@
+{
+  "name": "poke-birthday",
+  "version": "3.0.0",
+  "private": true,
+  "description": "PokéBirthday: invitación web personalizada generada con estructura ng new, Angular 22, GSAP, @lucide/angular y registro RSVP en Google Sheets.",
+  "engines": {
+    "node": "^22.22.3 || ^24.15.0 || ^26.0.0",
+    "npm": ">=10"
+  },
+  "scripts": {
+    "ng": "ng",
+    "start": "ng serve",
+    "start:network": "ng serve --host 0.0.0.0",
+    "build": "ng build --configuration production",
+    "build:dev": "ng build --configuration development",
+    "check": "ng build --configuration development",
+    "lint:types": "tsc -p tsconfig.app.json --noEmit"
+  },
+  "dependencies": {
+    "@angular/animations": "^22.0.4",
+    "@angular/common": "^22.0.4",
+    "@angular/compiler": "^22.0.4",
+    "@angular/core": "^22.0.4",
+    "@angular/platform-browser": "^22.0.4",
+    "@lucide/angular": "^1.7.0",
+    "gsap": "^3.13.0",
+    "rxjs": "~7.8.2",
+    "tslib": "^2.8.1",
+    "zone.js": "~0.16.2"
+  },
+  "devDependencies": {
+    "@angular/build": "^22.0.4",
+    "@angular/cli": "^22.0.4",
+    "@angular/compiler-cli": "^22.0.4",
+    "typescript": "~6.0.3"
+  }
+}

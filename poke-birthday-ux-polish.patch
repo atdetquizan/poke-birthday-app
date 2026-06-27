@@ -1,0 +1,635 @@
+diff --git a/README.md b/README.md
+index a08ba3c..98f1b3f 100644
+--- a/README.md
++++ b/README.md
+@@ -163,3 +163,8 @@ Ejemplos:
+ ```
+ 
+ Para hosting estático, configura fallback/rewrite de todas las rutas hacia `index.html`, de modo que `/invitacion/bastian` cargue la app Angular correctamente.
++
++
++## UX polish aplicado
++
++Este patch agrega una experiencia más guiada para usuarios no técnicos: botón para saltar intro, tarjeta de bienvenida clara, modal de nombre más humano, botones flotantes con estado confirmado/no podré, acciones de ubicación y calendario con mejor microcopy, y prevención de doble registro accidental.
+diff --git a/src/app/app.html b/src/app/app.html
+index 2acd025..a919a63 100644
+--- a/src/app/app.html
++++ b/src/app/app.html
+@@ -2,10 +2,16 @@
+ <div class="grain" aria-hidden="true"></div>
+ <div class="confetti-layer" id="confettiLayer" aria-hidden="true"></div>
+ 
+-<div class="trailer-intro" id="trailerIntro" aria-hidden="true">
++<div class="trailer-intro" id="trailerIntro" aria-label="Intro cinematográfica PokéBirthday">
++  <button class="trailer-skip" type="button" (click)="skipIntro()">Saltar intro</button>
+   <span class="trailer-line line-a"></span>
+   <span class="trailer-line line-b"></span>
+   <div class="trailer-bars"><span></span><span></span></div>
++  <div class="trailer-energy" aria-hidden="true"><i></i><i></i><i></i></div>
++  <div class="trailer-hud" aria-hidden="true">
++    <span>PokéBirthday</span>
++    <strong>Nivel {{ birthdayAge }}</strong>
++  </div>
+   <div class="trailer-character" aria-hidden="true">
+     <span class="trailer-burst"></span>
+     <span class="trailer-ash-shadow"></span>
+@@ -74,6 +80,13 @@
+           <strong>{{ guestDisplayName() }}</strong>
+           <span class="guest-note">{{ guestDisplayName() }}, una misión especial te espera.</span>
+         </div>
++
++        <div class="welcome-card reveal-item hero-reveal">
++          <span class="welcome-kicker">Misión especial</span>
++          <p><strong>{{ guestDisplayName() }}</strong>, estás invitado a la PokéBirthday de <strong>{{ birthdayName }}</strong>.</p>
++          <small>{{ event.dateLabel }} · {{ event.timeLabel }}</small>
++          <button class="welcome-cta" type="button" (click)="scrollToDetails()">Ver invitación</button>
++        </div>
+       </div>
+ 
+       <div class="stage-wrap" aria-label="Foto del cumpleañero enmarcada">
+@@ -156,17 +169,17 @@
+     </div>
+ 
+     <div class="action-card reveal-item cinema-card" aria-label="Acciones de la invitación">
+-      <h3>{{ guestDisplayName() }}, confirma desde la barra flotante</h3>
+-      <p>Los botones de asistencia quedan siempre visibles y registran la respuesta directamente en Google Sheets. Aquí tienes las acciones importantes, con mayor jerarquía visual.</p>
++      <h3>{{ guestDisplayName() }}, aquí tienes lo importante</h3>
++      <p>Confirma desde los botones flotantes. La respuesta se guarda en Google Sheets y las acciones de ubicación quedan listas para abrirse en un toque.</p>
+       <div class="quick-links" aria-label="Acciones rápidas">
+-        <a class="action-link action-link-map" [href]="mapUrl" target="_blank" rel="noreferrer">
++        <a class="action-link action-link-map route-card" [href]="mapUrl" target="_blank" rel="noreferrer">
+           <span class="link-icon" aria-hidden="true"><svg lucideMapPin aria-hidden="true"></svg></span>
+-          <span class="link-text"><strong>Ver ubicación</strong><small>Abrir ruta en Google Maps</small></span>
++          <span class="link-text"><strong>Cómo llegar</strong><small>{{ event.addressLine1 }} · Abrir en Google Maps</small></span>
+           <span class="link-arrow" aria-hidden="true"><svg lucideArrowUpRight aria-hidden="true"></svg></span>
+         </a>
+         <a class="action-link action-link-calendar" [href]="event.calendarFile" download>
+           <span class="link-icon" aria-hidden="true"><svg lucideCalendarPlus aria-hidden="true"></svg></span>
+-          <span class="link-text"><strong>Agregar al calendario</strong><small>Guardar fecha y hora del evento</small></span>
++          <span class="link-text"><strong>Recordarme la fecha</strong><small>Guardar en mi calendario</small></span>
+           <span class="link-arrow" aria-hidden="true"><svg lucideDownload aria-hidden="true"></svg></span>
+         </a>
+       </div>
+@@ -175,23 +188,57 @@
+ </main>
+ 
+ <aside class="mobile-dock floating-rsvp" aria-label="Confirmar asistencia">
+-  <button class="dock-btn yes" id="dockConfirm" type="button" aria-label="Sí, asistiré. Registrar asistencia en Google Sheets" [disabled]="isSubmitting() || needsGuestName()" [class.is-loading]="selectedStatus() === 'SI_ASISTIRE' && isSubmitting()" [class.is-saved]="selectedStatus() === 'SI_ASISTIRE' && lastSaved()" (click)="confirmAttendance()">
+-    <span class="btn-icon" aria-hidden="true"><svg lucideCircleCheck aria-hidden="true"></svg></span>
+-    <span class="btn-text"><strong>Confirmar</strong><small>Sí, asistiré</small></span>
+-  </button>
+-  <button class="dock-btn no" id="dockDecline" type="button" aria-label="No podré asistir. Registrar respuesta en Google Sheets" [disabled]="isSubmitting() || needsGuestName()" [class.is-loading]="selectedStatus() === 'NO_PODRE' && isSubmitting()" [class.is-saved]="selectedStatus() === 'NO_PODRE' && lastSaved()" (click)="declineAttendance()">
+-    <span class="btn-icon" aria-hidden="true"><svg lucideCircleX aria-hidden="true"></svg></span>
+-    <span class="btn-text"><strong>No podré</strong><small>No asistiré</small></span>
+-  </button>
++  @if (responseSaved()) {
++    <div class="dock-status" role="status" aria-live="polite">
++      <span class="dock-status-dot" aria-hidden="true"></span>
++      <strong>{{ responseStatusLabel() }}</strong>
++    </div>
++  }
++
++  <div class="dock-actions">
++    <button
++      class="dock-btn yes"
++      id="dockConfirm"
++      type="button"
++      aria-label="Sí, asistiré. Registrar asistencia en Google Sheets"
++      [disabled]="isSubmitting() || savedStatus() === 'SI_ASISTIRE'"
++      [class.is-loading]="selectedStatus() === 'SI_ASISTIRE' && isSubmitting()"
++      [class.is-saved]="savedStatus() === 'SI_ASISTIRE'"
++      (click)="confirmAttendance()"
++    >
++      <span class="btn-icon" aria-hidden="true"><svg lucideCircleCheck aria-hidden="true"></svg></span>
++      <span class="btn-text">
++        <strong>{{ savedStatus() === 'SI_ASISTIRE' ? 'Confirmado' : 'Confirmar' }}</strong>
++        <small>{{ savedStatus() && savedStatus() !== 'SI_ASISTIRE' ? 'Cambiar respuesta' : 'Sí asistiré' }}</small>
++      </span>
++    </button>
++
++    <button
++      class="dock-btn no"
++      id="dockDecline"
++      type="button"
++      aria-label="No podré asistir. Registrar respuesta en Google Sheets"
++      [disabled]="isSubmitting() || savedStatus() === 'NO_PODRE'"
++      [class.is-loading]="selectedStatus() === 'NO_PODRE' && isSubmitting()"
++      [class.is-saved]="savedStatus() === 'NO_PODRE'"
++      (click)="declineAttendance()"
++    >
++      <span class="btn-icon" aria-hidden="true"><svg lucideCircleX aria-hidden="true"></svg></span>
++      <span class="btn-text">
++        <strong>{{ savedStatus() === 'NO_PODRE' ? 'Avisado' : 'No podré' }}</strong>
++        <small>{{ savedStatus() && savedStatus() !== 'NO_PODRE' ? 'Cambiar respuesta' : 'Avisar que no asistiré' }}</small>
++      </span>
++    </button>
++  </div>
+ </aside>
+ 
+ 
+ @if (guestNamePromptVisible()) {
+   <section class="guest-name-modal" role="dialog" aria-modal="true" aria-labelledby="guestNameTitle">
+-    <div class="guest-name-panel cinema-card">
+-      <span class="guest-name-kicker">Antes de iniciar</span>
+-      <h2 id="guestNameTitle">¿Para quién es esta invitación?</h2>
+-      <p>Escribe el nombre del invitado para personalizar la aventura y registrar la asistencia correctamente.</p>
++    <div class="guest-name-panel cinema-card" [class.is-shaking]="guestNamePromptShake()">
++      <span class="guest-name-kicker">Personaliza tu pase</span>
++      <h2 id="guestNameTitle">¿A nombre de quién registramos la invitación?</h2>
++      <p>Escribe el nombre de la persona o familia invitada. Así la confirmación quedará clara en la lista.</p>
+ 
+       <label class="guest-name-field">
+         <span>Nombre del invitado</span>
+@@ -199,17 +246,18 @@
+           type="text"
+           maxlength="80"
+           autocomplete="name"
+-          placeholder="Ej. Bastian"
++          placeholder="Ej. Bastian, Familia Ramos"
++          required
+           [value]="guestNameDraft()"
+           (input)="onGuestNameInput($event)"
+           (keydown.enter)="saveGuestNameFromPrompt()"
+         />
+       </label>
+ 
+-      <small class="guest-id-preview">ID automático: {{ previewGuestId() || 'se-generara-con-tu-nombre' }}</small>
++      <small class="guest-id-preview">Ejemplo: Bastian, Familia Ramos, Thiago y mamá. ID automático: {{ previewGuestId() || 'se-generara-con-tu-nombre' }}</small>
+ 
+       <button class="guest-name-submit" type="button" [disabled]="!guestNameDraft().trim()" (click)="saveGuestNameFromPrompt()">
+-        Continuar aventura
++        Personalizar invitación
+       </button>
+     </div>
+   </section>
+diff --git a/src/app/app.ts b/src/app/app.ts
+index ec0bd41..9c6e307 100644
+--- a/src/app/app.ts
++++ b/src/app/app.ts
+@@ -56,6 +56,15 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
+   readonly isSubmitting = signal(false);
+   readonly selectedStatus = signal<AttendanceStatus | undefined>(undefined);
+   readonly lastSaved = signal(false);
++  readonly savedStatus = signal<AttendanceStatus | undefined>(undefined);
++  readonly guestNamePromptShake = signal(false);
++  readonly responseSaved = computed(() => !!this.savedStatus());
++  readonly responseStatusLabel = computed(() => {
++    const status = this.savedStatus();
++    if (status === 'SI_ASISTIRE') return `Confirmado: ${this.guestDisplayName()}`;
++    if (status === 'NO_PODRE') return `Respuesta guardada: ${this.guestDisplayName()} no podrá asistir`;
++    return '';
++  });
+ 
+   readonly birthdayName = environment.birthdayName;
+   readonly birthdayAge = environment.birthdayAge;
+@@ -64,6 +73,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
+ 
+   private readonly cleanupFns: Array<() => void> = [];
+   private toastTimer?: number;
++  private introTimeline?: gsap.core.Timeline;
+ 
+   ngOnInit(): void {
+     const guestName = this.resolveGuestFromRoute();
+@@ -83,6 +93,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
+   }
+ 
+   ngOnDestroy(): void {
++    this.introTimeline?.kill();
+     this.cleanupFns.forEach((cleanup) => cleanup());
+     this.cleanupFns.length = 0;
+     ScrollTrigger.getAll().forEach((trigger) => trigger.kill());
+@@ -90,6 +101,16 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
+     this.document.body.classList.remove('is-ready', 'intro-finished', 'dock-visible', 'gsap-missing');
+   }
+ 
++  skipIntro(): void {
++    this.introTimeline?.kill();
++    this.revealInvitationInstantly();
++  }
++
++  openGuestNamePrompt(): void {
++    this.needsGuestName.set(true);
++    this.focusGuestNameInput();
++  }
++
+   confirmAttendance(): void {
+     void this.submitAttendance('SI_ASISTIRE');
+   }
+@@ -107,7 +128,8 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
+     const name = this.clean(this.guestNameDraft());
+ 
+     if (!name) {
+-      this.showToast('Agrega tu nombre', 'Necesitamos saber para quién es la invitación antes de registrar la asistencia.');
++      this.showToast('Agrega tu nombre', 'Escribe un nombre para personalizar la invitación y registrar la asistencia.');
++      this.shakeGuestNamePanel();
+       return;
+     }
+ 
+@@ -115,7 +137,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
+     this.needsGuestName.set(false);
+ 
+     window.setTimeout(() => {
+-      gsap.fromTo('.guest-card', { scale: 0.96, y: 12 }, { scale: 1, y: 0, duration: 0.35, ease: 'back.out(1.7)' });
++      gsap.fromTo('.guest-card, .welcome-card', { scale: 0.96, y: 12 }, { scale: 1, y: 0, duration: 0.35, ease: 'back.out(1.7)' });
+     }, 0);
+   }
+ 
+@@ -125,8 +147,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
+     const guestName = this.clean(this.guestName());
+ 
+     if (!guestName) {
+-      this.needsGuestName.set(true);
++      this.openGuestNamePrompt();
+       this.showToast('Falta el nombre', 'Escribe tu nombre para personalizar y registrar la invitación.');
++      this.shakeGuestNamePanel();
+       return;
+     }
+ 
+@@ -162,16 +185,10 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
+     this.lastSaved.set(result.submitted);
+ 
+     if (result.submitted) {
++      this.savedStatus.set(status);
+       if (isYes) this.fireConfetti();
+ 
+-      const rowInfo = result.row ? ` Fila ${result.row}${result.sheetName ? ` en ${result.sheetName}` : ''}.` : '';
+-
+-      this.showToast(
+-        isYes ? '¡Asistencia registrada!' : 'Respuesta registrada',
+-        isYes
+-          ? `Guardamos el “Sí, asistiré” en Google Sheets.${rowInfo}`
+-          : `Guardamos el “No podré” en Google Sheets.${rowInfo}`
+-      );
++      this.announceSavedResponse(status, guestName);
+ 
+       if (environment.openWhatsappAfterRegister) {
+         const url = this.rsvp.buildWhatsappUrl(status, guestName);
+@@ -191,6 +208,25 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
+   }
+ 
+ 
++  private announceSavedResponse(status: AttendanceStatus, guestName: string): void {
++    const isYes = status === 'SI_ASISTIRE';
++
++    this.showToast(
++      isYes ? '¡Confirmado!' : 'Respuesta guardada',
++      isYes
++        ? `Gracias, ${guestName}. Tu asistencia quedó registrada.`
++        : `Gracias, ${guestName}. Registramos que no podrás asistir.`
++    );
++
++    window.setTimeout(() => {
++      gsap.fromTo(
++        '.dock-status',
++        { y: 10, opacity: 0, scale: 0.96 },
++        { y: 0, opacity: 1, scale: 1, duration: 0.35, ease: 'back.out(1.7)' }
++      );
++    }, 0);
++  }
++
+   private getRsvpErrorTitle(reason?: string): string {
+     if (reason === 'MISSING_ENDPOINT') return 'Falta configurar Google Sheets';
+     if (reason === 'TOKEN_INVALIDO') return 'Token inválido';
+@@ -333,6 +369,14 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
+     this.toastTimer = window.setTimeout(() => this.toastVisible.set(false), 3200);
+   }
+ 
++  private shakeGuestNamePanel(): void {
++    this.guestNamePromptShake.set(false);
++    window.requestAnimationFrame(() => {
++      this.guestNamePromptShake.set(true);
++      window.setTimeout(() => this.guestNamePromptShake.set(false), 520);
++    });
++  }
++
+   private focusGuestNameInput(): void {
+     if (!this.needsGuestName()) return;
+ 
+@@ -361,9 +405,19 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
+   }
+ 
+   private finishIntroWithoutMotion(): void {
++    this.revealInvitationInstantly();
++    this.document.getElementById('trailerIntro')?.remove();
++  }
++
++  private revealInvitationInstantly(): void {
++    this.splitText();
+     this.document.body.classList.add('is-ready', 'intro-finished', 'dock-visible');
+     this.introFinished.set(true);
+-    this.document.getElementById('trailerIntro')?.remove();
++
++    gsap.set('#trailerIntro', { autoAlpha: 0, display: 'none' });
++    gsap.set('.page-bg, .hero-reveal, .split-char, .pokemon-wordmark, .reveal-card, .sticker, .sticker-ball, .mission-section.reveal-item, .details-section .reveal-item, .detail-card .icon-box, .action-link, .action-link .link-icon, .mobile-dock.floating-rsvp .dock-btn, .dock-btn .btn-icon', { clearProps: 'all' });
++    gsap.set('.wordmark-underline', { strokeDashoffset: 0 });
++
+     this.focusGuestNameInput();
+   }
+ 
+@@ -382,7 +436,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
+ 
+     const dockBtnSet = { y: 18, scale: 0.94, filter: 'brightness(.82) blur(5px)' };
+ 
+-    gsap.set('.trailer-copy > *', { y: 46, opacity: 0, filter: 'blur(10px)' });
++    gsap.set('.trailer-copy > *, .trailer-hud > *', { y: 46, opacity: 0, filter: 'blur(10px)' });
++    gsap.set('.trailer-skip', { y: -12, opacity: 0 });
++    gsap.set('.trailer-energy i', { scaleX: 0, opacity: 0, transformOrigin: '0% 50%' });
+     gsap.set('.trailer-character', { x: 260, y: 42, scale: 0.72, rotation: 7, opacity: 0, filter: 'blur(12px)' });
+     gsap.set('.trailer-ash-shadow', { scaleX: 0.42, opacity: 0 });
+     gsap.set('.trailer-throw-ball', { x: 132, y: 118, scale: 0.22, rotation: -260, opacity: 0, filter: 'blur(6px)' });
+@@ -407,7 +463,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
+     gsap.set('.dock-btn .btn-icon', { scale: 0.7, rotation: -14, opacity: 0.7 });
+     gsap.set('.mobile-dock.floating-rsvp .dock-btn', dockBtnSet);
+ 
+-    const intro = gsap.timeline({
++    const intro = this.introTimeline = gsap.timeline({
+       defaults: { ease: 'expo.out' },
+       onComplete: () => {
+         this.document.body.classList.add('intro-finished');
+@@ -419,12 +475,15 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
+     intro
+       .to('.line-a', { xPercent: 115, duration: 0.82, ease: 'power4.inOut' }, 0.05)
+       .to('.line-b', { xPercent: -115, duration: 0.82, ease: 'power4.inOut' }, 0.05)
++      .to('.trailer-skip', { y: 0, opacity: 1, duration: 0.34, ease: 'power2.out' }, 0.08)
++      .to('.trailer-energy i', { scaleX: 1, opacity: 0.72, duration: 0.72, stagger: 0.06, ease: 'power3.out' }, 0.12)
+       .to('.trailer-character', { x: 0, y: 0, scale: 1, rotation: -2, opacity: 1, filter: 'blur(0px)', duration: 0.92, ease: 'back.out(1.45)' }, 0.12)
+       .to('.trailer-ash-shadow', { scaleX: 1, opacity: 0.62, duration: 0.62, ease: 'power2.out' }, 0.2)
+       .to('.trailer-throw-ball', { x: -210, y: -82, scale: 0.62, rotation: 540, opacity: 1, filter: 'blur(0px)', duration: 0.68, ease: 'power3.out' }, 0.42)
+       .to('.trailer-throw-ball', { opacity: 0, scale: 0.18, duration: 0.2, ease: 'power2.in' }, 0.98)
+       .to('.trailer-burst', { scale: 1, opacity: 0.82, rotation: 16, duration: 0.32, ease: 'power2.out' }, 0.82)
+       .to('.trailer-burst', { scale: 1.35, opacity: 0, duration: 0.42, ease: 'power2.out' }, 1.02)
++      .to('.trailer-hud > *', { y: 0, opacity: 1, filter: 'blur(0px)', duration: 0.5, stagger: 0.06 }, 0.18)
+       .to('.trailer-kicker', { y: 0, opacity: 1, filter: 'blur(0px)', duration: 0.58 }, 0.26)
+       .to('.trailer-copy strong', { y: 0, opacity: 1, filter: 'blur(0px)', duration: 0.8 }, 0.42)
+       .to('.trailer-flash', { opacity: 0.88, duration: 0.07, ease: 'none' }, 1.15)
+@@ -502,6 +561,15 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
+       ease: 'sine.inOut'
+     });
+ 
++    gsap.to('.action-link-map', {
++      boxShadow: '0 24px 52px rgba(35, 213, 255, .22), inset 0 1px 0 rgba(255,255,255,.24)',
++      duration: 1.2,
++      repeat: -1,
++      yoyo: true,
++      repeatDelay: 2.2,
++      ease: 'sine.inOut'
++    });
++
+     this.initScrollAnimations();
+     this.initTrainerTilt();
+   }
+diff --git a/src/styles.scss b/src/styles.scss
+index 808f1e6..6cb71e7 100644
+--- a/src/styles.scss
++++ b/src/styles.scss
+@@ -2415,3 +2415,250 @@ body.gsap-missing {
+     transform: none !important;
+   }
+ }
++
++
++/* UX polish patch: guided invitation, intro controls, clearer RSVP states */
++.trailer-skip {
++  position: fixed;
++  top: max(16px, env(safe-area-inset-top));
++  right: 16px;
++  z-index: 6;
++  min-height: 40px;
++  padding: 0 15px;
++  border: 1px solid rgba(255,255,255,.24);
++  border-radius: 999px;
++  background: rgba(7, 20, 45, .58);
++  color: #fff;
++  font-weight: 900;
++  letter-spacing: .02em;
++  box-shadow: 0 14px 34px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.22);
++  backdrop-filter: blur(14px);
++  cursor: pointer;
++}
++
++.trailer-skip:hover,
++.trailer-skip:focus-visible {
++  transform: translateY(-1px);
++  border-color: rgba(255, 215, 45, .7);
++  box-shadow: 0 16px 38px rgba(0,0,0,.32), 0 0 24px rgba(255, 215, 45, .18);
++}
++
++.trailer-hud {
++  position: absolute;
++  left: clamp(18px, 6vw, 72px);
++  bottom: clamp(28px, 9vh, 90px);
++  z-index: 3;
++  display: grid;
++  gap: 4px;
++  padding: 16px 18px;
++  border: 1px solid rgba(255,255,255,.18);
++  border-radius: 20px;
++  background: linear-gradient(135deg, rgba(255,255,255,.14), rgba(255,255,255,.04)), rgba(5, 17, 40, .6);
++  box-shadow: 0 22px 60px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.18);
++  backdrop-filter: blur(16px);
++}
++
++.trailer-hud span {
++  color: var(--yellow);
++  font-size: .78rem;
++  font-weight: 1000;
++  text-transform: uppercase;
++  letter-spacing: .18em;
++}
++
++.trailer-hud strong {
++  font-size: clamp(1.6rem, 7vw, 3.5rem);
++  line-height: .9;
++  text-transform: uppercase;
++  text-shadow: 0 8px 0 rgba(0,0,0,.32), 0 0 24px rgba(26,141,255,.44);
++}
++
++.trailer-energy {
++  position: absolute;
++  inset: 0;
++  z-index: 1;
++  pointer-events: none;
++  overflow: hidden;
++}
++
++.trailer-energy i {
++  position: absolute;
++  left: -12vw;
++  width: 124vw;
++  height: 3px;
++  border-radius: 999px;
++  background: linear-gradient(90deg, transparent, rgba(127, 230, 255, .92), rgba(255, 215, 45, .82), transparent);
++  box-shadow: 0 0 28px rgba(127, 230, 255, .42);
++  transform: rotate(-12deg);
++}
++
++.trailer-energy i:nth-child(1) { top: 22%; }
++.trailer-energy i:nth-child(2) { top: 50%; transform: rotate(9deg); }
++.trailer-energy i:nth-child(3) { top: 72%; }
++
++.welcome-card {
++  width: min(100%, 520px);
++  margin: 16px auto 0;
++  padding: 18px;
++  border-radius: var(--radius-lg);
++  border: 1px solid rgba(255,255,255,.16);
++  background:
++    radial-gradient(circle at 12% 0%, rgba(255,215,45,.20), transparent 38%),
++    linear-gradient(135deg, rgba(21, 92, 202, .74), rgba(8, 25, 60, .72));
++  box-shadow: 0 22px 55px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.20);
++  backdrop-filter: blur(16px);
++}
++
++.welcome-kicker {
++  display: inline-flex;
++  margin-bottom: 8px;
++  color: var(--yellow);
++  font-size: .78rem;
++  font-weight: 1000;
++  text-transform: uppercase;
++  letter-spacing: .14em;
++}
++
++.welcome-card p {
++  margin: 0;
++  font-size: clamp(1.1rem, 4.3vw, 1.55rem);
++  line-height: 1.16;
++  font-weight: 850;
++}
++
++.welcome-card small {
++  display: block;
++  margin-top: 8px;
++  color: rgba(255,255,255,.78);
++  font-weight: 800;
++}
++
++.welcome-cta {
++  width: 100%;
++  min-height: 48px;
++  margin-top: 14px;
++  border: 0;
++  border-radius: 16px;
++  color: #061832;
++  background: linear-gradient(180deg, #fff4a6, var(--yellow) 58%, #ffb71b);
++  box-shadow: 0 14px 30px rgba(255, 190, 26, .22), inset 0 1px 0 rgba(255,255,255,.74);
++  font-weight: 1000;
++  text-transform: uppercase;
++  letter-spacing: .03em;
++  cursor: pointer;
++}
++
++.welcome-cta:hover,
++.welcome-cta:focus-visible {
++  transform: translateY(-1px);
++  filter: brightness(1.05);
++}
++
++.action-card .quick-links {
++  gap: 14px;
++}
++
++.quick-links a.route-card {
++  min-height: 90px;
++  border-color: rgba(127, 230, 255, .46);
++  background:
++    radial-gradient(circle at 8% 0%, rgba(127,230,255,.26), transparent 42%),
++    linear-gradient(135deg, rgba(26,141,255,.34), rgba(255,255,255,.07));
++}
++
++.quick-links a.route-card .link-icon {
++  background: linear-gradient(180deg, rgba(127,230,255,.26), rgba(26,141,255,.26));
++  border-color: rgba(127,230,255,.44);
++}
++
++.mobile-dock.floating-rsvp {
++  grid-template-columns: 1fr 1fr;
++  align-items: stretch;
++  padding-top: 16px;
++}
++
++.mobile-dock.floating-rsvp .dock-status {
++  grid-column: 1 / -1;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  gap: 9px;
++  min-height: 30px;
++  margin: -2px 2px 2px;
++  padding: 6px 10px;
++  border-radius: 999px;
++  border: 1px solid rgba(255,255,255,.16);
++  background: rgba(255,255,255,.08);
++  color: rgba(255,255,255,.9);
++  font-size: .78rem;
++  font-weight: 900;
++  text-align: center;
++  box-shadow: inset 0 1px 0 rgba(255,255,255,.14);
++}
++
++.dock-status-dot {
++  width: 9px;
++  height: 9px;
++  border-radius: 50%;
++  background: var(--green);
++  box-shadow: 0 0 18px rgba(88, 255, 154, .62);
++  flex: 0 0 auto;
++}
++
++.mobile-dock.floating-rsvp .dock-actions {
++  grid-column: 1 / -1;
++  display: grid;
++  grid-template-columns: 1fr 1fr;
++  gap: clamp(10px, 2.6vw, 18px);
++  width: 100%;
++}
++
++.mobile-dock.floating-rsvp .dock-btn.is-saved {
++  opacity: .78;
++  filter: saturate(.85);
++  cursor: default;
++}
++
++.mobile-dock.floating-rsvp .dock-btn.is-saved strong::after {
++  content: "";
++}
++
++.guest-name-modal {
++  padding: max(24px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
++}
++
++.guest-name-panel.is-shaking {
++  animation: guestNameShake .44s ease both;
++}
++
++@keyframes guestNameShake {
++  0%, 100% { transform: translateX(0); }
++  18% { transform: translateX(-10px); }
++  36% { transform: translateX(9px); }
++  54% { transform: translateX(-7px); }
++  72% { transform: translateX(5px); }
++}
++
++@media (max-width: 560px) {
++  .trailer-hud {
++    left: 14px;
++    right: 14px;
++    bottom: 88px;
++  }
++
++  .trailer-character {
++    transform-origin: 58% 72%;
++  }
++
++  .welcome-card {
++    padding: 16px;
++  }
++
++  .mobile-dock.floating-rsvp .dock-status {
++    font-size: .7rem;
++  }
++
++  .mobile-dock.floating-rsvp .dock-actions {
++    gap: 10px;
++  }
++}

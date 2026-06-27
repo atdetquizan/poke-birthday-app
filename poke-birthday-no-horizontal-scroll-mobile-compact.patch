@@ -1,0 +1,672 @@
+diff --git a/src/app/app.html b/src/app/app.html
+index 1961f69..d18af28 100644
+--- a/src/app/app.html
++++ b/src/app/app.html
+@@ -2,9 +2,22 @@
+ <div class="grain" aria-hidden="true"></div>
+ <div class="confetti-layer" id="confettiLayer" aria-hidden="true"></div>
+ 
+-<div class="trailer-intro" id="trailerIntro" aria-hidden="true">
++<div class="trailer-intro" id="trailerIntro">
++  <button
++    class="trailer-skip"
++    type="button"
++    aria-label="Saltar intro y ver la invitación"
++    (click)="skipIntro()"
++  >
++    Saltar intro
++  </button>
+   <span class="trailer-line line-a"></span>
+   <span class="trailer-line line-b"></span>
++  <div class="trailer-energy" aria-hidden="true"><i></i><i></i><i></i></div>
++  <div class="trailer-hud" aria-hidden="true">
++    <span>PokéBirthday</span>
++    <strong>Nivel {{ birthdayAge }}</strong>
++  </div>
+   <div class="trailer-bars"><span></span><span></span></div>
+   <div class="trailer-character" aria-hidden="true">
+     <span class="trailer-burst"></span>
+@@ -12,7 +25,7 @@
+     <img class="trailer-ash" src="/assets/characters/ash-trainer.png" alt="" />
+     <img
+       class="trailer-throw-ball"
+-      src="/assets/stickers/pokeball-right.webp"
++      src="/assets/stickers/pokeball.webp"
+       alt=""
+     />
+   </div>
+@@ -169,11 +182,23 @@
+ 
+         <div class="guest-card reveal-item hero-reveal" aria-live="polite">
+           <span class="guest-label">Invitación para</span>
+-          <strong>{{ guestDisplayName() }}</strong>
++          <strong id="guestName">{{ guestDisplayName() }}</strong>
+           <span class="guest-note"
+             >{{ guestDisplayName() }}, una misión especial te espera.</span
+           >
+         </div>
++
++        <div class="welcome-card reveal-item hero-reveal" aria-live="polite">
++          <span class="welcome-kicker">Misión recibida</span>
++          <p>
++            <strong>{{ guestDisplayName() }}</strong>, estás invitado a la
++            PokéBirthday de {{ birthdayName }}.
++          </p>
++          <small>{{ event.dateLabel }} · {{ event.timeLabel }}</small>
++          <button class="welcome-cta" type="button" (click)="scrollToDetails()">
++            Ver invitación
++          </button>
++        </div>
+       </div>
+ 
+       <div class="stage-wrap" aria-label="Foto del cumpleañero enmarcada">
+@@ -290,11 +315,10 @@
+       class="action-card reveal-item cinema-card"
+       aria-label="Acciones de la invitación"
+     >
+-      <h3>{{ guestDisplayName() }}, confirma desde la barra flotante</h3>
++      <h3>Acciones útiles para llegar sin complicaciones</h3>
+       <p>
+-        Los botones de asistencia quedan siempre visibles y registran la
+-        respuesta directamente en Google Sheets. Aquí tienes las acciones
+-        importantes, con mayor jerarquía visual.
++        Usa estos accesos rápidos para abrir la ruta o guardar un recordatorio.
++        La asistencia se confirma desde los botones flotantes de abajo.
+       </p>
+       <div class="quick-links" aria-label="Acciones rápidas">
+         <a
+@@ -307,7 +331,7 @@
+             ><svg lucideMapPin aria-hidden="true"></svg
+           ></span>
+           <span class="link-text"
+-            ><strong>Ver ubicación</strong
++            ><strong>Cómo llegar</strong
+             ><small>Abrir ruta en Google Maps</small></span
+           >
+           <span class="link-arrow" aria-hidden="true"
+@@ -323,8 +347,8 @@
+             ><svg lucideCalendarPlus aria-hidden="true"></svg
+           ></span>
+           <span class="link-text"
+-            ><strong>Agregar al calendario</strong
+-            ><small>Guardar fecha y hora del evento</small></span
++            ><strong>Recordarme la fecha</strong
++            ><small>Guardar en mi calendario</small></span
+           >
+           <span class="link-arrow" aria-hidden="true"
+             ><svg lucideDownload aria-hidden="true"></svg
+@@ -336,6 +360,18 @@
+ </main>
+ 
+ <aside class="mobile-dock floating-rsvp" aria-label="Confirmar asistencia">
++  @if (responseSaved()) {
++  <div class="dock-status" role="status" aria-live="polite">
++    <span class="dock-status-dot" aria-hidden="true"></span>
++    <span>{{ responseStatusLabel() }}</span>
++  </div>
++  } @else {
++  <div class="dock-status dock-status-prompt" role="status" aria-live="polite">
++    <span class="dock-status-dot" aria-hidden="true"></span>
++    <span>Confirma tu asistencia aquí</span>
++  </div>
++  }
++  <div class="dock-actions">
+   <button
+     class="dock-btn yes"
+     id="dockConfirm"
+@@ -370,6 +406,7 @@
+       ><strong>No podré</strong><small>No asistiré</small></span
+     >
+   </button>
++  </div>
+ </aside>
+ 
+ @if (guestNamePromptVisible()) {
+@@ -379,12 +416,12 @@
+   aria-modal="true"
+   aria-labelledby="guestNameTitle"
+ >
+-  <div class="guest-name-panel cinema-card">
+-    <span class="guest-name-kicker">Antes de iniciar</span>
+-    <h2 id="guestNameTitle">¿Para quién es esta invitación?</h2>
++  <div class="guest-name-panel cinema-card" [class.is-shaking]="guestNamePromptShake()">
++    <span class="guest-name-kicker">Personaliza tu invitación</span>
++    <h2 id="guestNameTitle">¿A nombre de quién registramos la invitación?</h2>
+     <p>
+-      Escribe el nombre del invitado para personalizar la aventura y registrar
+-      la asistencia correctamente.
++      Escribe el nombre tal como quieres que aparezca. Puede ser una persona o
++      una familia.
+     </p>
+ 
+     <label class="guest-name-field">
+@@ -393,7 +430,7 @@
+         type="text"
+         maxlength="80"
+         autocomplete="name"
+-        placeholder="Ej. Bastian"
++        placeholder="Ej. Bastian, Familia Ramos"
+         [value]="guestNameDraft()"
+         (input)="onGuestNameInput($event)"
+         (keydown.enter)="saveGuestNameFromPrompt()"
+@@ -411,7 +448,7 @@
+       [disabled]="!guestNameDraft().trim()"
+       (click)="saveGuestNameFromPrompt()"
+     >
+-      Continuar aventura
++      Continuar
+     </button>
+   </div>
+ </section>
+diff --git a/src/styles.scss b/src/styles.scss
+index 072bd6d..7b81919 100644
+--- a/src/styles.scss
++++ b/src/styles.scss
+@@ -2857,4 +2857,505 @@ body.gsap-missing {
+   .mobile-dock.floating-rsvp .dock-actions {
+     gap: 10px;
+   }
+-}
+\ No newline at end of file
++}
++/* V11: no horizontal scroll + compact mobile UX.
++   Keep decorative glow/stickers inside the viewport and make the invitation faster to read on phones. */
++html,
++body {
++  width     : 100%;
++  max-width : 100%;
++  overflow-x: hidden;
++}
++
++@supports (overflow: clip) {
++  html,
++  body {
++    overflow-x: clip;
++  }
++}
++
++* {
++  min-width: 0;
++}
++
++.page-bg,
++.grain,
++.trailer-intro,
++.site-shell,
++.hero-section,
++.hero-layout,
++.hero-copy,
++.stage-wrap,
++.mission-section,
++.details-section,
++.action-card,
++.mobile-dock.floating-rsvp {
++  max-width: 100vw;
++}
++
++.hero-section,
++.stage-wrap,
++.details-section,
++.mobile-dock.floating-rsvp {
++  overflow-x: clip;
++}
++
++.guest-card strong,
++.welcome-card strong,
++.detail-card strong,
++.detail-card small,
++.link-text strong,
++.link-text small,
++.dock-status span:last-child {
++  overflow-wrap: anywhere;
++  word-break   : normal;
++}
++
++/* The old .card-glow element could paint outside the card and create horizontal scroll.
++   Keep the glow as an internal pseudo-element instead. */
++.card-glow {
++  display: none !important;
++}
++
++.trainer-card {
++  overflow: hidden;
++  contain : paint;
++}
++
++.trainer-card::after {
++  content       : "";
++  position      : absolute;
++  inset         : 8% 5% auto;
++  height        : 42%;
++  z-index       : 0;
++  border-radius : 999px;
++  background    : radial-gradient(circle, rgba(127, 230, 255, .42), rgba(26, 141, 255, .13) 48%, transparent 72%);
++  filter        : blur(16px);
++  opacity       : .76;
++  pointer-events: none;
++}
++
++.frame-topline,
++.photo-frame,
++.photo-caption {
++  position: relative;
++  z-index : 1;
++}
++
++.pokemon-wordmark,
++.pokemon-title-svg {
++  max-width: 100%;
++}
++
++/* Mobile-first compact mode: fewer empty gaps, smaller trainer card, safer stickers. */
++@media (max-width: 640px) {
++  :root {
++    --dock-height: 96px;
++    --radius-lg  : 20px;
++  }
++
++  .site-shell {
++    width  : min(calc(100% - 14px), var(--max));
++    padding: 8px 0 calc(var(--dock-height) + 18px);
++  }
++
++  .top-bar {
++    gap          : 8px;
++    margin-bottom: 6px;
++  }
++
++  .mini-pill,
++  .skip-link {
++    min-height    : 32px;
++    padding-inline: 10px;
++    font-size     : .68rem;
++  }
++
++  .hero-section {
++    min-height     : auto;
++    justify-content: flex-start;
++    padding        : 8px 0 14px;
++  }
++
++  .hero-layout {
++    gap: 10px;
++  }
++
++  .eyebrow {
++    margin-bottom       : 2px;
++    font-size           : clamp(1rem, 5.2vw, 1.45rem);
++    -webkit-text-stroke : 2px rgba(2, 8, 19, .94);
++    text-shadow         : 0 4px 0 rgba(0, 0, 0, .26), 0 0 16px rgba(26, 141, 255, .55);
++  }
++
++  .pokemon-wordmark {
++    width     : min(100%, 360px);
++    margin-top: -10px;
++  }
++
++  .pokemon-title-svg {
++    overflow: visible;
++  }
++
++  .headline-main {
++    margin-top: -2px;
++    padding   : .12em .28em .14em;
++    font-size : clamp(.95rem, 5.4vw, 1.32rem);
++  }
++
++  .guest-card,
++  .welcome-card {
++    width        : min(100%, 420px);
++    margin-top   : 10px;
++    padding      : 12px 13px;
++    border-radius: 20px;
++  }
++
++  #guestName,
++  .guest-card strong {
++    margin     : 2px 0;
++    font-size  : clamp(1.28rem, 7.6vw, 1.72rem);
++    line-height: .95;
++  }
++
++  .guest-label,
++  .guest-note,
++  .welcome-kicker {
++    font-size     : .66rem;
++    letter-spacing: .09em;
++  }
++
++  .guest-note,
++  .welcome-card small {
++    line-height: 1.22;
++  }
++
++  .welcome-card p {
++    font-size  : clamp(.98rem, 4.7vw, 1.18rem);
++    line-height: 1.12;
++  }
++
++  .welcome-cta {
++    min-height   : 42px;
++    margin-top   : 10px;
++    border-radius: 14px;
++    font-size    : .82rem;
++  }
++
++  .stage-wrap {
++    min-height   : 354px;
++    margin-top   : 4px;
++    border-radius: 30px;
++    overflow     : clip;
++  }
++
++  .trainer-card {
++    width        : min(74vw, 300px);
++    padding      : 9px;
++    border-radius: 28px;
++    transform    : rotate(-.8deg);
++  }
++
++  .trainer-card::before {
++    inset        : -3px;
++    padding      : 3px;
++    border-radius: 31px;
++  }
++
++  .trainer-card::after {
++    inset : 7% 7% auto;
++    height: 38%;
++    filter: blur(12px);
++  }
++
++  .frame-topline {
++    padding       : 2px 4px 7px;
++    font-size     : .6rem;
++    letter-spacing: .1em;
++  }
++
++  .photo-frame {
++    border-width : 3px;
++    border-radius: 20px;
++  }
++
++  .photo-caption {
++    padding: 9px 5px 2px;
++  }
++
++  .photo-caption strong {
++    font-size: clamp(1rem, 4.8vw, 1.25rem);
++  }
++
++  .caption-kicker {
++    font-size: .62rem;
++  }
++
++  .sticker {
++    filter: drop-shadow(0 10px 18px rgba(0, 0, 0, .35));
++  }
++
++  .sticker-pika {
++    width : 72px;
++    left  : 5px;
++    bottom: 54px;
++  }
++
++  .sticker-bulbasaur {
++    width: 82px;
++    left : 4px;
++    top  : 58px;
++  }
++
++  .sticker-squirtle {
++    width: 72px;
++    right: 8px;
++    top  : 46px;
++  }
++
++  .sticker-charmander {
++    width : 76px;
++    right : 9px;
++    bottom: 58px;
++  }
++
++  .sticker-ball {
++    width: 42px;
++  }
++
++  .ball-left {
++    top : 18px;
++    left: 4px;
++  }
++
++  .ball-right {
++    top  : 82px;
++    right: 4px;
++  }
++
++  .mission-section {
++    margin: 4px auto 16px;
++  }
++
++  .mission-banner {
++    gap                  : 10px;
++    padding              : 12px;
++    border-radius        : 22px;
++    grid-template-columns: 1fr auto;
++  }
++
++  .mission-kicker {
++    font-size: .64rem;
++  }
++
++  .mission-copy strong {
++    font-size: clamp(1.05rem, 5.9vw, 1.42rem);
++  }
++
++  .age-badge {
++    width        : 82px;
++    border-radius: 18px;
++  }
++
++  .age-badge strong {
++    font-size: 2rem;
++  }
++
++  .subline {
++    max-width  : 34ch;
++    margin-top : 9px;
++    font-size  : .88rem;
++    line-height: 1.28;
++  }
++
++  .details-section {
++    padding: 12px 0 20px;
++  }
++
++  .section-heading {
++    margin-bottom: 10px;
++  }
++
++  .section-heading h2 {
++    font-size: clamp(1.45rem, 8vw, 2.18rem);
++  }
++
++  .details-grid {
++    gap: 9px;
++  }
++
++  .detail-card {
++    grid-template-columns: 44px minmax(0, 1fr);
++    gap                  : 10px;
++    padding              : 12px;
++    border-radius        : 18px;
++  }
++
++  .icon-box {
++    width        : 44px;
++    height       : 44px;
++    border-radius: 14px;
++  }
++
++  .icon-box svg,
++  .link-icon svg {
++    width : 20px;
++    height: 20px;
++  }
++
++  .detail-label {
++    font-size     : .66rem;
++    letter-spacing: .08em;
++  }
++
++  .detail-card strong {
++    font-size  : .96rem;
++    line-height: 1.12;
++  }
++
++  .detail-card small {
++    margin-top : 2px;
++    font-size  : .78rem;
++    line-height: 1.22;
++  }
++
++  .action-card {
++    margin-top   : 10px;
++    padding      : 14px 12px;
++    border-radius: 20px;
++  }
++
++  .action-card h3 {
++    font-size  : clamp(1.05rem, 6.2vw, 1.52rem);
++    line-height: .96;
++  }
++
++  .action-card p {
++    font-size  : .84rem;
++    line-height: 1.32;
++  }
++
++  .quick-links {
++    gap: 9px;
++  }
++
++  .quick-links a.action-link {
++    min-height           : 66px;
++    grid-template-columns: 42px minmax(0, 1fr) 18px;
++    gap                  : 9px;
++    padding              : 9px 10px;
++    border-radius        : 18px;
++  }
++
++  .link-icon {
++    width        : 42px;
++    height       : 42px;
++    border-radius: 14px;
++  }
++
++  .link-text strong {
++    font-size: .88rem;
++  }
++
++  .link-text small {
++    font-size: .71rem;
++  }
++
++  .mobile-dock.floating-rsvp {
++    left         : 0 !important;
++    right        : 0 !important;
++    bottom       : 0 !important;
++    width        : 100% !important;
++    border-radius: 22px 22px 0 0 !important;
++    padding      : 8px 10px calc(8px + env(safe-area-inset-bottom)) !important;
++    gap          : 7px;
++    overflow     : hidden;
++  }
++
++  .mobile-dock.floating-rsvp .dock-status {
++    min-height   : 24px;
++    margin       : -1px 2px 0;
++    padding      : 4px 8px;
++    border-radius: 999px;
++    font-size    : .66rem;
++    line-height  : 1.12;
++  }
++
++  .dock-status-dot {
++    width : 7px;
++    height: 7px;
++  }
++
++  .mobile-dock.floating-rsvp .dock-actions {
++    gap: 8px;
++  }
++
++  .mobile-dock.floating-rsvp .dock-btn {
++    min-height   : 54px;
++    border-radius: 16px;
++    padding      : 7px 8px;
++    gap          : 7px;
++  }
++
++  .mobile-dock.floating-rsvp .btn-icon {
++    width        : 29px;
++    height       : 29px;
++    border-radius: 10px;
++  }
++
++  .mobile-dock.floating-rsvp .btn-icon svg {
++    width : 18px;
++    height: 18px;
++  }
++
++  .mobile-dock.floating-rsvp .btn-text strong {
++    font-size: .84rem;
++  }
++
++  .mobile-dock.floating-rsvp .btn-text small {
++    display: none;
++  }
++
++  .rsvp-toast {
++    left     : 10px;
++    right    : 10px;
++    bottom   : calc(var(--dock-height, 96px) + 10px + env(safe-area-inset-bottom));
++    max-width: none;
++  }
++
++  .guest-name-panel {
++    width        : min(100%, 420px);
++    padding      : 18px;
++    border-radius: 24px;
++  }
++}
++
++@media (max-width: 360px) {
++  :root {
++    --dock-height: 88px;
++  }
++
++  .site-shell {
++    width: min(calc(100% - 10px), var(--max));
++  }
++
++  .trainer-card {
++    width: min(72vw, 270px);
++  }
++
++  .stage-wrap {
++    min-height: 322px;
++  }
++
++  .mobile-dock.floating-rsvp .btn-icon {
++    display: none;
++  }
++
++  .mobile-dock.floating-rsvp .dock-btn {
++    min-height: 50px;
++  }
++
++  .mobile-dock.floating-rsvp .btn-text strong {
++    font-size: .8rem;
++  }
++}
